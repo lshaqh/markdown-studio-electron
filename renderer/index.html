@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-ui="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Markdown Studio · 离线 Markdown 编辑 / 阅读 / 公众号导出</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button class="btn ghost icon" id="btnSidebar" title="文件栏 (Ctrl+B 不冲突时可用)">▤</button>
+  <div class="brand">
+    <div class="brand-mark">M</div>
+    <div>Markdown Studio <small>offline</small></div>
+  </div>
+
+  <div class="tabs" id="viewTabs">
+    <button data-view="split" class="active">分栏</button>
+    <button data-view="write">编辑</button>
+    <button data-view="read">阅读</button>
+  </div>
+
+  <div class="spacer"></div>
+
+  <select class="select" id="themeSelect" title="文章主题"></select>
+  <button class="btn ghost" id="btnThemes" title="主题面板">主题</button>
+  <button class="btn ghost icon" id="btnToc" title="目录 (Ctrl+\)">☰</button>
+  <button class="btn ghost" id="btnFolder" title="选择文件夹，批量浏览 md">文件夹</button>
+  <button class="btn ghost" id="btnOpen" title="打开单个本地 Markdown">打开</button>
+  <button class="btn ghost" id="btnSave" title="保存 (Ctrl+S)">保存</button>
+  <button class="btn ghost icon" id="btnSettings" title="设置">⚙</button>
+  <button class="btn ghost icon" id="btnUi" title="界面深色">◐</button>
+  <button class="btn primary" id="btnExport">导出微信</button>
+</header>
+
+<main class="workspace" id="workspace">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <span class="sidebar-title" id="sidebarTitle">文件夹</span>
+      <button class="btn ghost icon" id="btnPickFolder" title="选择文件夹">📁</button>
+      <button class="btn ghost icon" id="btnCollapse" title="收起">«</button>
+    </div>
+    <div class="sidebar-search">
+      <input id="fileSearch" type="search" placeholder="筛选文件名…" autocomplete="off">
+    </div>
+    <div class="file-tree" id="fileTree"></div>
+    <div class="sidebar-foot" id="sidebarFoot">还没有选择文件夹</div>
+  </aside>
+
+  <div class="panes" id="panes">
+  <section class="pane editor-pane" id="editorPane">
+    <div class="toolbar" id="toolbar">
+      <button class="tb" data-act="bold" title="加粗 Ctrl+B"><b>B</b></button>
+      <button class="tb" data-act="italic" title="斜体 Ctrl+I"><i>I</i></button>
+      <button class="tb" data-act="strike" title="删除线"><s>S</s></button>
+      <button class="tb" data-act="code" title="行内代码">&lt;/&gt;</button>
+      <span class="sep"></span>
+      <button class="tb" data-act="h1" title="一级标题">H1</button>
+      <button class="tb" data-act="h2" title="二级标题">H2</button>
+      <button class="tb" data-act="h3" title="三级标题">H3</button>
+      <span class="sep"></span>
+      <button class="tb" data-act="quote" title="引用">❝</button>
+      <button class="tb" data-act="ul" title="无序列表">•</button>
+      <button class="tb" data-act="ol" title="有序列表">1.</button>
+      <button class="tb" data-act="task" title="任务列表">☑</button>
+      <span class="sep"></span>
+      <button class="tb" data-act="codeblock" title="代码块">{ }</button>
+      <button class="tb" data-act="math" title="块级公式">∑</button>
+      <button class="tb" data-act="inlineMath" title="行内公式">$x$</button>
+      <span class="tb-wrap">
+        <button class="tb" data-act="diagram" title="插入图表（可选竖排/横排/拆分）">◈</button>
+      </span>
+      <button class="tb" data-act="table" title="表格">▦</button>
+      <button class="tb" data-act="link" title="链接 Ctrl+K">🔗</button>
+      <button class="tb" data-act="image" title="插入图片（转 base64，可直接粘贴到公众号）">🖼</button>
+      <button class="tb" data-act="hr" title="分隔线">—</button>
+    </div>
+
+    <div class="editor-wrap">
+      <div id="editor" class="cm-host"></div>
+    </div>
+
+    <div class="statusbar">
+      <span id="statFile">未命名.md</span>
+      <span class="dot" id="statDot"></span>
+      <span id="statSave">就绪</span>
+      <span id="statWord">0 字</span>
+      <span id="statLine">0 行</span>
+      <span class="spacer" style="flex:1"></span>
+      <span id="statCursor">1:1</span>
+    </div>
+  </section>
+
+  <div class="splitter" id="splitter" title="拖动调整分栏"></div>
+
+  <section class="pane preview-pane">
+    <div class="progress" id="progress"></div>
+    <div class="preview-scroll" id="previewScroll">
+      <article id="preview"><div class="md-body" data-theme="classic"></div></article>
+    </div>
+    <div class="toc-panel" id="tocPanel"></div>
+  </section>
+  </div>
+</main>
+
+<div class="sidebar-mask" id="sidebarMask"></div>
+
+<!-- 主题面板 -->
+<div class="mask" id="themeMask">
+  <div class="modal">
+    <div class="modal-head">
+      <span>文章主题</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn ghost" data-close="themeMask">关闭</button>
+    </div>
+    <div class="modal-body">
+      <div class="theme-grid" id="themeGrid"></div>
+      <p style="font-size:12px;color:var(--muted);margin:14px 0 0;line-height:1.7">
+        主题同时作用于预览与公众号导出。导出时所有样式会被写入每个元素的 <code>style</code> 属性，
+        因为微信编辑器会丢弃 <code>&lt;style&gt;</code> 与 class 规则。
+      </p>
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn" id="btnSettings2">流程图方向 / 字号 / 导出设置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 导出面板 -->
+<div class="mask" id="exportMask">
+  <div class="modal">
+    <div class="modal-head">
+      <span>导出到微信公众号</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn ghost" data-close="exportMask">关闭</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn primary" id="btnCopyWx">复制到公众号</button>
+        <button class="btn" id="btnDownloadHtml">下载 HTML</button>
+        <button class="btn" id="btnDownloadMd">下载 .md</button>
+        <button class="btn" id="btnNewDoc">新建</button>
+      </div>
+      <div class="field">
+        <div><div class="label">公式转为 PNG 图片</div>
+          <div class="hint">部分公众号环境对内联 SVG 支持不佳时开启，兼容性最好</div></div>
+        <label class="switch"><input type="checkbox" id="optMathPng"><span></span></label>
+      </div>
+      <div class="field">
+        <div><div class="label">外链转「文字 + 链接」</div>
+          <div class="hint">公众号正文不解析普通外链，开启后读者可复制链接</div></div>
+        <label class="switch"><input type="checkbox" id="optLinkText"><span></span></label>
+      </div>
+      <div class="field">
+        <div><div class="label">移除 class 属性</div>
+          <div class="hint">更纯净的 HTML，体积更小；一般无需开启</div></div>
+        <label class="switch"><input type="checkbox" id="optStripClass"><span></span></label>
+      </div>
+      <div id="exportWarn" style="display:none;margin-top:10px;padding:8px 12px;border-radius:6px;background:#fff7ed;color:#9a3412;font-size:12px;line-height:1.6"></div>
+      <div style="margin-top:14px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">导出效果预览（内联样式后）</div>
+        <div class="export-preview" id="exportPreview"></div>
+      </div>
+      <div style="margin-top:12px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">HTML 源码
+          <span id="exportSize" style="float:right"></span></div>
+        <textarea class="code-area" id="exportCode" readonly></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span style="font-size:12px;color:var(--muted);margin-right:auto">提示：在公众号后台使用 Ctrl/Cmd+V 直接粘贴</span>
+      <button class="btn" data-close="exportMask">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 设置面板 -->
+<div class="mask" id="settingsMask">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head">
+      <span>设置</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn ghost" data-close="settingsMask">关闭</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <div><div class="label">预览宽度</div><div class="hint">公众号正文典型宽度 677px</div></div>
+        <input type="range" id="optWidth" min="480" max="900" step="20">
+      </div>
+      <div class="field">
+        <div><div class="label">编辑器字号</div><div class="hint">左侧源码区的字号，12–20px</div></div>
+        <input type="number" id="optEditorFont" min="12" max="20" step="1">
+      </div>
+      <div class="field">
+        <div><div class="label">正文字号覆盖</div><div class="hint">0 表示使用主题默认字号</div></div>
+        <input type="number" id="optFont" min="0" max="22" step="0.5">
+      </div>
+      <div class="field">
+        <div><div class="label">流程图方向</div>
+          <div class="hint">竖排在小屏上字号更大；横排适合宽屏长链条</div></div>
+        <select class="select" id="optDiagramDir">
+          <option value="TB">竖排 TB（默认）</option>
+          <option value="LR">横排 LR</option>
+          <option value="auto">跟随源码</option>
+        </select>
+      </div>
+      <div class="field">
+        <div><div class="label">界面深色</div><div class="hint">只影响编辑器界面，不影响文章主题</div></div>
+        <label class="switch"><input type="checkbox" id="optUiDark"><span></span></label>
+      </div>
+      <div class="field">
+        <div><div class="label">自动保存草稿</div><div class="hint">内容保存在本浏览器 localStorage</div></div>
+        <label class="switch"><input type="checkbox" id="optAutoSave"><span></span></label>
+      </div>
+      <div class="field">
+        <div><div class="label">编辑/预览滚动同步</div><div class="hint">滚动一侧时另一侧按比例跟随</div></div>
+        <label class="switch"><input type="checkbox" id="optSync"><span></span></label>
+      </div>
+      <div class="field" id="fieldCloseToTray">
+        <div><div class="label">关闭时最小化到托盘</div><div class="hint">点 × 不退出，窗口留在后台；再次打开或点托盘图标即秒开</div></div>
+        <label class="switch"><input type="checkbox" id="optCloseToTray"><span></span></label>
+      </div>
+      <div class="field" id="fieldAutoLaunch">
+        <div><div class="label">开机自动驻留后台</div><div class="hint">登录后在托盘待命、不弹窗口；首次打开无需等待加载</div></div>
+        <label class="switch"><input type="checkbox" id="optAutoLaunch"><span></span></label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="btnReset">恢复默认</button>
+      <button class="btn primary" data-close="settingsMask">完成</button>
+    </div>
+  </div>
+</div>
+
+<div class="popmenu" id="diagramMenu">
+  <button data-diagram="TB">竖排流程图 TB<span class="pm-hint">默认，小屏字大</span></button>
+  <button data-diagram="LR">横排流程图 LR<span class="pm-hint">宽屏长链条</span></button>
+  <button data-diagram="split">拆成两张图<span class="pm-hint">主干 + 分支</span></button>
+  <button data-diagram="seq">时序图</button>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="dropzone" id="dropzone">松开以打开 Markdown 文件</div>
+<input type="file" id="fileInput" accept=".md,.markdown,.mdown,.txt,.mkd" style="display:none">
+<input type="file" id="dirInput" webkitdirectory directory multiple style="display:none">
+<input type="file" id="filesInput" accept=".md,.markdown,.mdown,.mkd,.txt" multiple style="display:none">
+<input type="file" id="imgInput" accept="image/*" style="display:none">
+
+<style id="themeStyle"></style>
+
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      processEscapes: true,
+      packages: { '[+]': ['ams', 'newcommand', 'configmacros'] }
+    },
+    svg: { fontCache: 'local', scale: 1.02, displayAlign: 'center' },
+    options: { enableMenu: false, enableAssistiveMml: false, skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] },
+    startup: { typeset: false }
+  };
+</script>
+<script src="lib/marked.min.js"></script>
+<script src="lib/highlight.min.js"></script>
+<script src="js/themes.js"></script>
+<script src="js/inline.js"></script>
+<script src="js/render.js"></script>
+<script src="lib/cm6.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/vault.js"></script>
+<script src="js/app.js"></script>
+<script src="js/native.js"></script>
+<!-- MathJax(tex-svg.js, 2MB) 与 mermaid(2.5MB) 改为首屏之后按需加载：
+     只有文档真的含公式 / 图表时才下载解析，普通文档冷启动不再付这笔开销。 -->
+</body>
+</html>

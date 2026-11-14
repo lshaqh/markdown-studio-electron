@@ -1,0 +1,86 @@
+{
+  "name": "markdown-studio",
+  "productName": "Markdown Studio",
+  "version": "1.0.0",
+  "description": "离线 Markdown 编辑器 / 阅读器：公式、代码高亮、mermaid 图表、公众号一键导出",
+  "main": "electron/main.js",
+  "author": "Markdown Studio",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --win --dir",
+    "portable": "electron-builder --win portable",
+    "build:cm6": "cd tools && npx esbuild entry.js --bundle --format=iife --global-name=CM6 --minify --target=es2020 --outfile=../renderer/lib/cm6.js"
+  },
+  "devDependencies": {
+    "electron": "^33.2.3",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.mdstudio.editor",
+    "productName": "Markdown Studio",
+    "copyright": "Markdown Studio",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+    "build/icon.ico",
+    "build/icon.png",
+    "build/tray.png",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "MarkdownStudio-${version}-${arch}.${ext}",
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown Document",
+          "description": "Markdown 文档",
+          "icon": "build/icon.ico",
+          "role": "Editor"
+        },
+        {
+          "ext": "markdown",
+          "name": "Markdown Document",
+          "description": "Markdown 文档",
+          "icon": "build/icon.ico",
+          "role": "Editor"
+        },
+        {
+          "ext": "mdown",
+          "name": "Markdown Document",
+          "description": "Markdown 文档",
+          "icon": "build/icon.ico",
+          "role": "Editor"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Markdown Studio",
+      "deleteAppDataOnUninstall": false,
+      "differentialPackage": false
+    },
+    "portable": {
+      "artifactName": "MarkdownStudio-${version}-portable.${ext}"
+    }
+  }
+}

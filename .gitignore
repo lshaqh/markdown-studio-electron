@@ -1,0 +1,17 @@
+# 依赖
+node_modules/
+tools/node_modules/
+
+# 构建产物与安装包（exe 走 GitHub Releases）
+release/
+release-v*/
+dist/
+out/
+*.exe
+
+# 本地状态
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.local
