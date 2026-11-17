@@ -99,6 +99,7 @@ const DEFAULT_CFG = {
   theme: 'classic', view: 'split', width: 680, fontSize: 0, editorFont: 14,
   uiDark: false, autoSave: true, sync: true,
   mathPng: false, linkText: false, stripClass: false, split: 0.5,
+  sidebarWidth: 236,
   diagramDir: 'TB'
 };
 
@@ -893,7 +894,7 @@ function initSettingsUI() {
 
   $('#btnReset').addEventListener('click', () => {
     cfg = Object.assign({}, DEFAULT_CFG, { theme: cfg.theme });
-    initSettingsUI(); applyWidth(); applyEditorFont(); applyTheme(); applyUi(); applySplit(); saveCfg();
+    initSettingsUI(); applyWidth(); applyEditorFont(); applySidebarWidth(); applyTheme(); applyUi(); applySplit(); saveCfg();
     toast('已恢复默认设置');
   });
 }
@@ -926,6 +927,17 @@ function applyEditorFont() {
 function applyWidth() {
   document.documentElement.style.setProperty('--preview-w', cfg.width + 'px');
   markAnchorsDirty();
+}
+
+const SIDEBAR_MIN = 180;
+const SIDEBAR_MAX = 520;
+function clampSidebarWidth(v) {
+  const n = Number(v);
+  return Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, isFinite(n) && n > 0 ? Math.round(n) : 236));
+}
+function applySidebarWidth() {
+  cfg.sidebarWidth = clampSidebarWidth(cfg.sidebarWidth);
+  document.documentElement.style.setProperty('--sidebar-w', cfg.sidebarWidth + 'px');
 }
 
 function applyUi() {
@@ -1145,6 +1157,37 @@ function bindEvents() {
     document.addEventListener('mouseup', up);
   });
 
+  // 文件栏宽度拖动（移动端是抽屉，禁用）
+  const sbResizer = $('#sidebarResizer');
+  if (sbResizer) {
+    sbResizer.addEventListener('mousedown', (e) => {
+      if (window.innerWidth <= 860) return;
+      e.preventDefault();
+      const sb = $('#sidebar');
+      const left = sb.getBoundingClientRect().left;
+      document.body.classList.add('sidebar-resizing');
+      const move = (ev) => {
+        cfg.sidebarWidth = clampSidebarWidth(ev.clientX - left);
+        applySidebarWidth();
+      };
+      const up = () => {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        document.body.classList.remove('sidebar-resizing');
+        saveCfg();
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+    sbResizer.addEventListener('dblclick', (e) => {
+      if (window.innerWidth <= 860) return;
+      e.preventDefault();
+      cfg.sidebarWidth = 236;
+      applySidebarWidth(); saveCfg();
+      toast('文件栏宽度已恢复默认');
+    });
+  }
+
   // 图片插入
   $('#imgInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -1340,6 +1383,7 @@ function boot() {
   applyTheme();
   applyWidth();
   applyEditorFont();
+  applySidebarWidth();
   applyUi();
   initSettingsUI();
   initAppPrefs();

@@ -312,7 +312,7 @@ const Vault = (() => {
         const visible = state.entries.some(e => e.path.startsWith(k.path + '/') && matchesFilter(e.path));
         if (!visible) return;
         const isOpen = state.filter ? true : state.expanded.has(k.path);
-        out.push(`<div class="tree-row ${isOpen ? 'open' : ''}" data-kind="dir" data-path="${esc(k.path)}" style="padding-left:${6 + depth * 12}px">
+        out.push(`<div class="tree-row ${isOpen ? 'open' : ''}" data-kind="dir" data-path="${esc(k.path)}" style="padding-left:${6 + depth * 12}px" title="${esc(k.name)}">
           <span class="caret">▶</span><span class="ico">📁</span><span class="nm">${esc(k.name)}</span>
         </div>`);
         if (isOpen) renderRows(k, depth + 1, out);
@@ -320,7 +320,7 @@ const Vault = (() => {
         if (!matchesFilter(k.path)) return;
         const active = state.current === k.path ? ' active' : '';
         const dot = cache.has(k.path) ? '<span class="dirty-dot" title="有未保存修改"></span>' : '';
-        out.push(`<div class="tree-row${active}" data-kind="file" data-path="${esc(k.path)}" style="padding-left:${6 + depth * 12}px">
+        out.push(`<div class="tree-row${active}" data-kind="file" data-path="${esc(k.path)}" style="padding-left:${6 + depth * 12}px" title="${esc(k.name)}">
           <span class="caret"></span><span class="ico">📄</span><span class="nm">${esc(k.name)}</span>${dot}
         </div>`);
       }
