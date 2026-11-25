@@ -156,6 +156,15 @@ const EditorAdapter = (() => {
     }
   }, { decorations: v => v.decorations });
 
+  /* 把图片块声明为「原子范围」：
+     否则光标一旦落进那段 base64，装饰就会失效、原文整个露出来，
+     退格/删除也只删掉一个字符。声明成原子后，方向键整块跳过，
+     退格与删除一次删掉整张图（CodeMirror 的 deleteBy/skipAtomic 会处理）。 */
+  const imageAtomic = CM6.EditorView.atomicRanges.of(view => {
+    const p = view.plugin(imageFold);
+    return (p && p.decorations) || CM6.Decoration.none;
+  });
+
   /* ---------------- 初始化 ---------------- */
   function init(mountEl, opts = {}) {
     if (!window.CM6) {
@@ -238,6 +247,7 @@ const EditorAdapter = (() => {
           }
         }),
         imageFold,
+        imageAtomic,
         CM6.markdown({ base: CM6.markdownLanguage, addKeymap: true }),
         keysCompartment.of(buildKeys()),
         CM6.EditorView.updateListener.of((u) => {
