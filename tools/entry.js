@@ -7,7 +7,8 @@ import {
   Decoration, WidgetType, ViewPlugin
 } from '@codemirror/view';
 import {
-  defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, selectAll
+  defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, selectAll,
+  undoDepth, redoDepth
 } from '@codemirror/commands';
 import {
   syntaxHighlighting, HighlightStyle, bracketMatching, indentOnInput, indentUnit,
@@ -50,6 +51,7 @@ export {
   highlightSpecialChars, placeholder, scrollPastEnd,
   Decoration, WidgetType, ViewPlugin,
   defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, selectAll,
+  undoDepth, redoDepth,
   syntaxHighlighting, HighlightStyle, bracketMatching, indentOnInput, indentUnit,
   foldGutter, foldKeymap,
   markdown, markdownLanguage,

@@ -506,6 +506,14 @@ const ACTIONS = {
 };
 
 /* ---------------- 输入事件 ---------------- */
+/** 撤销 / 重做按钮的可用状态：直接问 CodeMirror 的历史栈深度 */
+function syncHistoryButtons() {
+  const u = $('#btnUndo'), r = $('#btnRedo');
+  if (!u || !r) return;
+  u.disabled = !editor.canUndo();
+  r.disabled = !editor.canRedo();
+}
+
 function onInput() {
   doc.text = editor.value;
   if (loadingDoc) return;   // 正在切换文档，不算修改
@@ -829,9 +837,11 @@ function loadDocument({ name, path, text, writable, abs }) {
   currentWritable = !!writable;
   currentAbs = abs || null;
   editor.value = doc.text;
+  if (editor.resetHistory) editor.resetHistory();   // 换文件后清空撤销栈
   dirty = false;
   renderNow();
   loadingDoc = false;
+  syncHistoryButtons();
   syncWindowTitle();
   previewScroll.scrollTop = 0;
   editor.scrollTop = 0;
@@ -867,9 +877,11 @@ function newDocument() {
   currentWritable = false;
   currentAbs = null;
   editor.value = '';
+  if (editor.resetHistory) editor.resetHistory();
   dirty = false;
   renderNow();
   loadingDoc = false;
+  syncHistoryButtons();
   syncWindowTitle();
   $('#exportMask').classList.remove('show');
   toast('已新建空文档');
@@ -1061,6 +1073,15 @@ function applyUi() {
 function bindEvents() {
   // 编辑器
   editor.addEventListener('input', onInput);
+
+  // 撤销 / 重做按钮：状态跟随历史栈，没得撤销时置灰
+  const btnUndo = $('#btnUndo'), btnRedo = $('#btnRedo');
+  if (btnUndo && btnRedo) {
+    btnUndo.addEventListener('click', () => { editor.undo(); syncHistoryButtons(); });
+    btnRedo.addEventListener('click', () => { editor.redo(); syncHistoryButtons(); });
+  }
+  ['input', 'keyup', 'click'].forEach(t => editor.addEventListener(t, syncHistoryButtons));
+  syncHistoryButtons();
 
   /* ---- 滚动同步：谁在被用户滚，谁就是主控，另一侧跟随 ---- */
   const progressEl = $('#progress');

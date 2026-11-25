@@ -7,6 +7,7 @@
 const EditorAdapter = (() => {
   let view = null;
   let keysCompartment = null;
+  let historyCompartment = null;
   const listeners = {};
   const userKeys = [];
 
@@ -177,6 +178,7 @@ const EditorAdapter = (() => {
       return false;
     }
     keysCompartment = new CM6.Compartment();
+    historyCompartment = new CM6.Compartment();
 
     const theme = CM6.EditorView.theme({
       '&': { height: '100%', backgroundColor: 'transparent' },
@@ -219,7 +221,7 @@ const EditorAdapter = (() => {
         CM6.lineNumbers(),
         CM6.highlightActiveLineGutter(),
         CM6.highlightSpecialChars(),
-        CM6.history(),
+        historyCompartment.of(CM6.history()),
         CM6.drawSelection(),
         CM6.dropCursor(),
         CM6.EditorState.allowMultipleSelections.of(true),
@@ -289,6 +291,18 @@ const EditorAdapter = (() => {
         scrollIntoView: false
       });
       view.scrollDOM.scrollTop = 0;
+    },
+
+    /* 撤销 / 重做：CodeMirror 自带历史栈，这里只提供按钮入口和可用性查询 */
+    undo() { return view ? CM6.undo(view) : false; },
+    redo() { return view ? CM6.redo(view) : false; },
+    canUndo() { return view ? CM6.undoDepth(view.state) > 0 : false; },
+    canRedo() { return view ? CM6.redoDepth(view.state) > 0 : false; },
+    /** 换文件后清空历史，否则第一次撤销会把上一个文档的内容倒回来 */
+    resetHistory() {
+      if (!view || !historyCompartment) return;
+      view.dispatch({ effects: historyCompartment.reconfigure([]) });
+      view.dispatch({ effects: historyCompartment.reconfigure([CM6.history()]) });
     },
 
     get selectionStart() { return view ? view.state.selection.main.from : 0; },

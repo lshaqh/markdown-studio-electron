@@ -217,6 +217,8 @@ body.sidebar-resizing { cursor: col-resize; user-select: none; }
   display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;
 }
 .toolbar .tb:hover { background: var(--accent-soft); color: var(--accent); }
+.toolbar .tb:disabled { opacity: .32; background: transparent; color: var(--muted); cursor: default; }
+.toolbar .tb:disabled:hover { background: transparent; color: var(--muted); }
 .toolbar .sep { width: 1px; height: 14px; background: var(--border); margin: 0 4px; flex: 0 0 auto; }
 
 /* 工具栏下拉菜单 */
