@@ -129,6 +129,35 @@ const EditorAdapter = (() => {
     ignoreEvent() { return false; }
   }
 
+  /* 展开源码后，原来的图片块已被替换成文字，必须留一个「收回去」的入口，
+     否则只能手动删掉整段 base64。按钮放在行首，展开时 scrollIntoView 也落在行首，
+     所以它一定在视野里。 */
+  class ImageFoldBack extends CM6.WidgetType {
+    constructor(from, view) {
+      super();
+      this.from = from;
+      this.view = view;
+    }
+    eq(o) { return o.from === this.from; }
+    toDOM() {
+      const btn = document.createElement('span');
+      btn.className = 'cm-img-foldback';
+      btn.textContent = '收起图片';
+      btn.title = '把这段 base64 重新折叠成图片预览';
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.view.dispatch({
+          effects: toggleImageFold.of(this.from),
+          selection: { anchor: this.from },
+          scrollIntoView: true
+        });
+      });
+      return btn;
+    }
+    ignoreEvent() { return false; }
+  }
+
   function buildImageDecos(view) {
     const b = new CM6.RangeSetBuilder();
     const unfolded = view.state.field(unfoldedImages);
@@ -152,7 +181,13 @@ const EditorAdapter = (() => {
         while ((m = IMG_DATA_RE.exec(line.text))) {
           const start = line.from + m.index;
           const end = start + m[0].length;
-          if (unfolded.has(start)) continue;
+          if (unfolded.has(start)) {
+            b.add(start, start, CM6.Decoration.widget({
+              widget: new ImageFoldBack(start, view),
+              side: -1
+            }));
+            continue;
+          }
           b.add(start, end, CM6.Decoration.replace({
             widget: new ImageChip(m[1], m[2], start, view),
             inclusive: false
