@@ -243,6 +243,28 @@
   </div>
 </div>
 
+<!-- 图片源码：真实照片的 base64 有十几万字符，摊在编辑区会把那一行撑到几万像素高，
+     所以不在这里展开，改成弹窗查看 / 修改 -->
+<div class="mask" id="imgSrcMask">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-head">
+      <span>图片源码</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn ghost" data-close="imgSrcMask">关闭</button>
+    </div>
+    <div class="modal-body">
+      <div class="hint" id="imgSrcHint" style="margin-bottom:8px"></div>
+      <textarea class="img-src-area" id="imgSrcText" spellcheck="false"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="btnImgSrcCopy">复制</button>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn" data-close="imgSrcMask">取消</button>
+      <button class="btn primary" id="btnImgSrcApply">应用到文档</button>
+    </div>
+  </div>
+</div>
+
 <div class="popmenu" id="diagramMenu">
   <button data-diagram="TB">竖排流程图 TB<span class="pm-hint">默认，小屏字大</span></button>
   <button data-diagram="LR">横排流程图 LR<span class="pm-hint">宽屏长链条</span></button>

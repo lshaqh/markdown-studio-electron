@@ -275,15 +275,15 @@ body.sidebar-resizing { cursor: col-resize; user-select: none; }
 }
 .cm-img-chip__size { font-size: 10.5px; line-height: 1.4; color: var(--muted); }
 
-/* 已展开的图片：行首的「收起图片」按钮 */
-.cm-img-foldback {
-  display: inline-block; margin-right: 8px; padding: 1px 9px;
-  border: 1px solid var(--border); border-radius: 999px;
-  background: var(--panel-2); color: var(--muted);
-  font-size: 11px; line-height: 1.7; cursor: pointer; user-select: none;
-  vertical-align: middle; white-space: nowrap;
+/* 图片源码弹窗 */
+.img-src-area {
+  width: 100%; height: 300px; resize: vertical; box-sizing: border-box;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); color: var(--text);
+  font-family: var(--mono); font-size: 12px; line-height: 1.55;
+  word-break: break-all; white-space: pre-wrap;
 }
-.cm-img-foldback:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.img-src-area:focus { outline: none; border-color: var(--accent); }
 
 .statusbar {
   flex: 0 0 auto; height: 26px; display: flex; align-items: center; gap: 12px;

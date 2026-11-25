@@ -60,30 +60,14 @@ const EditorAdapter = (() => {
     ]);
   }
 
-  /* ---------------- 图片占位：把超长 base64 折叠成缩略徽章 ----------------
+  /* ---------------- 图片占位：把超长 base64 折叠成图片块 ----------------
    *  只在视图层用 Decoration 替换，文档内容仍是原始 base64，
    *  保存 / 导出 / 复制走的都是完整 data URI，不改变 md 文件本身。
+   *  点击图片块弹出源码编辑框——真实的照片 base64 有十几万字符，
+   *  摊在编辑区里会把这一行撑到几万像素高，既看不了也改不动。
    * ---------------------------------------------------------------- */
   // 刻意不匹配换行：Decoration.replace 跨行会抛「跨行替换」错误
   const IMG_DATA_RE = /!\[([^\]\n]{0,120})\]\((data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+)\)/gi;
-
-  const toggleImageFold = CM6.StateEffect.define();
-  const unfoldedImages = CM6.StateField.define({
-    create: () => new Set(),
-    update(set, tr) {
-      let next = set;
-      for (const e of tr.effects) {
-        if (e.is(toggleImageFold)) {
-          next = new Set(next);
-          if (next.has(e.value)) next.delete(e.value);
-          else next.add(e.value);
-        }
-      }
-      // 文档一变，记录的偏移就失效了，直接复位避免错位折叠
-      if (tr.docChanged && next.size) next = new Set();
-      return next;
-    }
-  });
 
   function imgBytesLabel(b64) {
     const n = Math.floor(b64.length * 3 / 4);
@@ -92,18 +76,22 @@ const EditorAdapter = (() => {
   }
 
   class ImageChip extends CM6.WidgetType {
-    constructor(alt, dataUrl, from, view) {
+    constructor(alt, dataUrl, from, to, source) {
       super();
       this.alt = alt;
       this.dataUrl = dataUrl;
       this.from = from;
-      this.view = view;
+      this.to = to;
+      this.source = source;
     }
-    eq(o) { return o.alt === this.alt && o.dataUrl === this.dataUrl && o.from === this.from; }
+    eq(o) {
+      return o.alt === this.alt && o.dataUrl === this.dataUrl &&
+             o.from === this.from && o.to === this.to;
+    }
     toDOM() {
       const chip = document.createElement('span');
       chip.className = 'cm-img-chip';
-      chip.title = (this.alt || '图片') + ' · ' + imgBytesLabel(this.dataUrl) + '（点击展开源码）';
+      chip.title = (this.alt || '图片') + ' · ' + imgBytesLabel(this.dataUrl) + '（点击查看 / 编辑源码）';
       const thumb = document.createElement('img');
       thumb.className = 'cm-img-chip__thumb';
       thumb.src = this.dataUrl;
@@ -116,51 +104,21 @@ const EditorAdapter = (() => {
       name.textContent = this.alt || '未命名图片';
       const size = document.createElement('span');
       size.className = 'cm-img-chip__size';
-      size.textContent = imgBytesLabel(this.dataUrl) + ' · 点击展开源码';
+      size.textContent = imgBytesLabel(this.dataUrl) + ' · 点击查看源码';
       meta.append(name, size);
       chip.append(thumb, meta);
       chip.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this.view.dispatch({ effects: toggleImageFold.of(this.from) });
+        emit('editimage', { from: this.from, to: this.to, source: this.source });
       });
       return chip;
     }
     ignoreEvent() { return false; }
   }
 
-  /* 展开源码后，原来的图片块已被替换成文字，必须留一个「收回去」的入口，
-     否则只能手动删掉整段 base64。按钮放在行首，展开时 scrollIntoView 也落在行首，
-     所以它一定在视野里。 */
-  class ImageFoldBack extends CM6.WidgetType {
-    constructor(from, view) {
-      super();
-      this.from = from;
-      this.view = view;
-    }
-    eq(o) { return o.from === this.from; }
-    toDOM() {
-      const btn = document.createElement('span');
-      btn.className = 'cm-img-foldback';
-      btn.textContent = '收起图片';
-      btn.title = '把这段 base64 重新折叠成图片预览';
-      btn.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.view.dispatch({
-          effects: toggleImageFold.of(this.from),
-          selection: { anchor: this.from },
-          scrollIntoView: true
-        });
-      });
-      return btn;
-    }
-    ignoreEvent() { return false; }
-  }
-
   function buildImageDecos(view) {
     const b = new CM6.RangeSetBuilder();
-    const unfolded = view.state.field(unfoldedImages);
     const doc = view.state.doc;
     const seen = new Set();
     for (const { from, to } of view.visibleRanges) {
@@ -181,15 +139,8 @@ const EditorAdapter = (() => {
         while ((m = IMG_DATA_RE.exec(line.text))) {
           const start = line.from + m.index;
           const end = start + m[0].length;
-          if (unfolded.has(start)) {
-            b.add(start, start, CM6.Decoration.widget({
-              widget: new ImageFoldBack(start, view),
-              side: -1
-            }));
-            continue;
-          }
           b.add(start, end, CM6.Decoration.replace({
-            widget: new ImageChip(m[1], m[2], start, view),
+            widget: new ImageChip(m[1], m[2], start, end, m[0]),
             inclusive: false
           }));
         }
@@ -201,8 +152,7 @@ const EditorAdapter = (() => {
   const imageFold = CM6.ViewPlugin.fromClass(class {
     constructor(view) { this.decorations = buildImageDecos(view); }
     update(u) {
-      const toggle = u.state.field(unfoldedImages) !== u.startState.field(unfoldedImages);
-      if (u.docChanged || u.viewportChanged || toggle) this.decorations = buildImageDecos(u.view);
+      if (u.docChanged || u.viewportChanged) this.decorations = buildImageDecos(u.view);
     }
   }, { decorations: v => v.decorations });
 
@@ -287,7 +237,6 @@ const EditorAdapter = (() => {
             return true;
           }
         }),
-        unfoldedImages,
         imageFold,
         CM6.markdown({ base: CM6.markdownLanguage, addKeymap: true }),
         keysCompartment.of(buildKeys()),
@@ -357,6 +306,15 @@ const EditorAdapter = (() => {
       const a = Math.max(0, Math.min(from, len));
       const b = Math.max(0, Math.min(to == null ? a : to, len));
       view.dispatch({ selection: { anchor: a, head: b }, scrollIntoView: true });
+    },
+
+    /** 用新内容替换指定范围（图片源码编辑框「应用」用），走正常历史栈 */
+    replaceRange(from, to, text) {
+      if (!view) return;
+      const len = view.state.doc.length;
+      const a = Math.max(0, Math.min(from, len));
+      const b = Math.max(a, Math.min(to == null ? a : to, len));
+      view.dispatch({ changes: { from: a, to: b, insert: String(text == null ? '' : text) } });
     },
 
     setRangeText(text, from, to, mode) {

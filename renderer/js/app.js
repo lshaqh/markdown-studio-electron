@@ -1083,6 +1083,54 @@ function bindEvents() {
   ['input', 'keyup', 'click'].forEach(t => editor.addEventListener(t, syncHistoryButtons));
   syncHistoryButtons();
 
+  /* 图片源码弹窗：点击编辑区里的图片块打开。
+     不把 base64 直接摊在编辑区，是因为十几万字符会把那一行撑到几万像素高，
+     既没法看，收回图片块后行高也不会自动恢复。 */
+  let imgSrcRange = null;
+  let imgSrcOrig = '';
+  editor.addEventListener('editimage', (d) => {
+    if (!d) return;
+    imgSrcRange = { from: d.from, to: d.to };
+    imgSrcOrig = d.source || '';
+    const ta = $('#imgSrcText');
+    ta.value = d.source || '';
+    $('#imgSrcHint').textContent =
+      '整段 Markdown 源码，共 ' + (d.source || '').length.toLocaleString() + ' 个字符。' +
+      '可直接修改；点「应用到文档」会替换编辑区里的这一块。';
+    $('#imgSrcMask').classList.add('show');
+    setTimeout(() => {
+      const el = $('#imgSrcText');
+      el.focus();
+      el.setSelectionRange(0, 0);
+      el.scrollTop = 0;
+    }, 40);
+  });
+  $('#btnImgSrcApply').addEventListener('click', () => {
+    if (!imgSrcRange) { $('#imgSrcMask').classList.remove('show'); return; }
+    // 弹窗开着时文档若被别处改动，记录的位置就已失效，宁可拒绝也不要写坏内容
+    const now = editor.value.slice(imgSrcRange.from, imgSrcRange.to);
+    if (now !== imgSrcOrig) {
+      $('#imgSrcMask').classList.remove('show');
+      imgSrcRange = null;
+      toast('文档在弹窗期间发生了变化，源码未写入，请重新点击图片', true);
+      return;
+    }
+    editor.replaceRange(imgSrcRange.from, imgSrcRange.to, $('#imgSrcText').value);
+    $('#imgSrcMask').classList.remove('show');
+    imgSrcRange = null;
+    toast('图片源码已更新');
+  });
+  $('#btnImgSrcCopy').addEventListener('click', async () => {
+    const el = $('#imgSrcText');
+    try {
+      await navigator.clipboard.writeText(el.value);
+    } catch (e) {
+      el.select();
+      document.execCommand('copy');
+    }
+    toast('已复制图片源码');
+  });
+
   /* ---- 滚动同步：谁在被用户滚，谁就是主控，另一侧跟随 ---- */
   const progressEl = $('#progress');
   let editorRAF = 0, previewRAF = 0;   // 两侧独立合并，避免互相吞掉
