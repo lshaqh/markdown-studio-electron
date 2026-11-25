@@ -100,6 +100,7 @@ const DEFAULT_CFG = {
   uiDark: false, autoSave: true, sync: true,
   mathPng: false, linkText: false, stripClass: false, split: 0.5,
   sidebarWidth: 236,
+  stripImgOnSave: false,
   diagramDir: 'TB'
 };
 
@@ -881,35 +882,87 @@ async function openFirstVaultDoc() {
   if (d) loadDocument(d);
 }
 
+/* ---------------- 保存时移除内嵌图片 ----------------
+ *  base64 图片会让 md 文件膨胀到几百 KB 甚至几 MB。
+ *  开启该选项后，只在「写盘这一刻」把 data URI 图片剔除，
+ *  并把剔除后的内容同步回编辑器，避免出现「文件里没有、界面上还有」的假象。
+ *  逐行处理：图片独占一行时连空行一起去掉，行内图片只删图片本身。
+ * ------------------------------------------------------ */
+const SAVE_IMG_RE = /!\[([^\]\n]{0,200})\]\((data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+)\)/gi;
+
+function stripImagesForSave(text) {
+  let removed = 0;
+  let dropNextBlank = false;   // 整行删图后，紧跟着的空白行也一并收掉，避免留下 \n\n\n
+  const keep = [];
+  for (const line of String(text == null ? '' : text).split('\n')) {
+    if (dropNextBlank) {
+      dropNextBlank = false;
+      if (line.trim() === '') continue;
+    }
+    if (line.indexOf('data:image') < 0) { keep.push(line); continue; }
+    let hit = false;
+    let replaced = line.replace(SAVE_IMG_RE, () => { hit = true; removed++; return ''; });
+    if (!hit) { keep.push(line); continue; }
+    if (replaced.trim() === '') { dropNextBlank = true; continue; }   // 整行只有图片 → 整行删掉
+    // 行内图被删后常留下连续空格，收一下再写
+    replaced = replaced.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+$/, '');
+    keep.push(replaced);
+  }
+  return { text: removed ? keep.join('\n') : text, removed };
+}
+
+/** 保存后把剔除过图片的内容同步回编辑器（保留滚动位置，不算新的修改） */
+function applyStrippedDoc(text) {
+  const sc = editor.view ? editor.view.scrollDOM.scrollTop : 0;
+  loadingDoc = true;
+  editor.value = text;
+  doc.text = text;
+  if (editor.view) editor.view.scrollDOM.scrollTop = sc;
+  loadingDoc = false;
+  dirty = false;
+  renderNow();
+  syncWindowTitle();
+  $('#statDot').className = 'dot';
+  $('#statSave').textContent = '已保存';
+}
+
 async function saveDocument() {
+  const prep = cfg.stripImgOnSave ? stripImagesForSave(doc.text) : { text: doc.text, removed: 0 };
+  const text = prep.text;
+
+  const done = () => {
+    if (prep.removed > 0) {
+      applyStrippedDoc(text);
+      toast(`已保存，并移除 ${prep.removed} 张内嵌图片`);
+      return;
+    }
+    dirty = false;
+    $('#statDot').className = 'dot';
+    $('#statSave').textContent = '已保存';
+    syncWindowTitle();
+    toast('已保存到 ' + doc.name);
+  };
+
   // Electron：直接写回绝对路径
   if (window.native && currentAbs) {
-    const r = await window.native.writeFile(currentAbs, doc.text);
+    const r = await window.native.writeFile(currentAbs, text);
     if (r && r.ok) {
-      dirty = false;
-      $('#statDot').className = 'dot';
-      $('#statSave').textContent = '已保存';
-      syncWindowTitle();
-      toast('已保存到 ' + doc.name);
+      done();
     } else {
       toast('保存失败：' + (r && r.error || '未知错误'), true);
     }
     return;
   }
   if (currentPath) {
-    const r = await Vault.savePath(currentPath, doc.text);
+    const r = await Vault.savePath(currentPath, text);
     if (r.ok) {
-      dirty = false;
       Vault.clearDirty(currentPath);
-      $('#statDot').className = 'dot';
-      $('#statSave').textContent = '已保存';
-      syncWindowTitle();
-      toast('已保存到 ' + doc.name);
+      done();
       return;
     }
     if (r.reason === 'denied') { toast('没有写入权限，改为下载', true); }
   }
-  download(doc.name || 'untitled.md', doc.text, 'text/markdown;charset=utf-8');
+  download(doc.name || 'untitled.md', text, 'text/markdown;charset=utf-8');
   toast('已下载 ' + (doc.name || 'untitled.md'));
 }
 
@@ -922,6 +975,7 @@ function initSettingsUI() {
   $('#optUiDark').checked = cfg.uiDark;
   $('#optAutoSave').checked = cfg.autoSave;
   $('#optSync').checked = cfg.sync;
+  $('#optStripImg').checked = cfg.stripImgOnSave;
   $('#optMathPng').checked = cfg.mathPng;
   $('#optLinkText').checked = cfg.linkText;
   $('#optStripClass').checked = cfg.stripClass;
@@ -943,6 +997,11 @@ function initSettingsUI() {
   $('#optUiDark').addEventListener('change', e => { cfg.uiDark = e.target.checked; applyUi(); saveCfg(); });
   $('#optAutoSave').addEventListener('change', e => { cfg.autoSave = e.target.checked; saveCfg(); });
   $('#optSync').addEventListener('change', e => { cfg.sync = e.target.checked; saveCfg(); });
+  $('#optStripImg').addEventListener('change', e => {
+    cfg.stripImgOnSave = e.target.checked;
+    saveCfg();
+    if (cfg.stripImgOnSave) toast('已开启：按 Ctrl+S 保存时会移除文档内的 base64 图片');
+  });
   $('#optMathPng').addEventListener('change', e => { cfg.mathPng = e.target.checked; saveCfg(); refreshExportPanel(); });
   $('#optLinkText').addEventListener('change', e => { cfg.linkText = e.target.checked; saveCfg(); refreshExportPanel(); });
   $('#optStripClass').addEventListener('change', e => { cfg.stripClass = e.target.checked; saveCfg(); refreshExportPanel(); });

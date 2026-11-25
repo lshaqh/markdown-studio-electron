@@ -107,10 +107,17 @@ const EditorAdapter = (() => {
       thumb.className = 'cm-img-chip__thumb';
       thumb.src = this.dataUrl;
       thumb.alt = this.alt || '';
-      const label = document.createElement('span');
-      label.className = 'cm-img-chip__label';
-      label.textContent = (this.alt ? this.alt + ' · ' : '图片 · ') + imgBytesLabel(this.dataUrl);
-      chip.append(thumb, label);
+      thumb.draggable = false;
+      const meta = document.createElement('span');
+      meta.className = 'cm-img-chip__meta';
+      const name = document.createElement('span');
+      name.className = 'cm-img-chip__name';
+      name.textContent = this.alt || '未命名图片';
+      const size = document.createElement('span');
+      size.className = 'cm-img-chip__size';
+      size.textContent = imgBytesLabel(this.dataUrl) + ' · 点击展开源码';
+      meta.append(name, size);
+      chip.append(thumb, meta);
       chip.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -124,18 +131,32 @@ const EditorAdapter = (() => {
   function buildImageDecos(view) {
     const b = new CM6.RangeSetBuilder();
     const unfolded = view.state.field(unfoldedImages);
+    const doc = view.state.doc;
+    const seen = new Set();
     for (const { from, to } of view.visibleRanges) {
-      const text = view.state.doc.sliceString(from, to);
-      IMG_DATA_RE.lastIndex = 0;
-      let m;
-      while ((m = IMG_DATA_RE.exec(text))) {
-        const start = from + m.index;
-        const end = start + m[0].length;
-        if (unfolded.has(start)) continue;
-        b.add(start, end, CM6.Decoration.replace({
-          widget: new ImageChip(m[1], m[2], start, view),
-          inclusive: false
-        }));
+      /* 关键：不能直接 sliceString(from, to)。
+         一张真实照片的 data URI 是「一整行」几十万字符，高度远超视口，
+         视口边界必然落在这行中间，切出来的文本没有结尾的 ")"，正则永远匹配不上
+         —— 表现为「插入图片后 base64 完全不折叠」。
+         所以按整行取文本，同一行只扫一次。 */
+      const first = doc.lineAt(from).number;
+      const last = doc.lineAt(to).number;
+      for (let n = first; n <= last; n++) {
+        if (seen.has(n)) continue;
+        seen.add(n);
+        const line = doc.line(n);
+        if (line.text.indexOf('data:image') < 0) continue;   // 绝大多数行直接跳过，不做正则
+        IMG_DATA_RE.lastIndex = 0;
+        let m;
+        while ((m = IMG_DATA_RE.exec(line.text))) {
+          const start = line.from + m.index;
+          const end = start + m[0].length;
+          if (unfolded.has(start)) continue;
+          b.add(start, end, CM6.Decoration.replace({
+            widget: new ImageChip(m[1], m[2], start, view),
+            inclusive: false
+          }));
+        }
       }
     }
     return b.finish();
