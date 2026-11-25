@@ -420,6 +420,20 @@ function surround(before, after, placeholder) {
   onInput();
 }
 
+/* 统一的图片插入入口：工具栏选择、拖拽、剪贴板粘贴都走这里 */
+function insertImageFile(file) {
+  if (!file || !/^image\//i.test(file.type || '')) return;
+  if (file.size > 2.5 * 1024 * 1024) toast('图片较大（>2.5MB），公众号可能拒绝', true);
+  const reader = new FileReader();
+  reader.onload = () => {
+    const alt = (file.name || 'image').replace(/\.[^.]+$/, '');
+    surround('![', `](${reader.result})`, alt);
+    toast('图片已插入（base64 内嵌，编辑区折叠显示）');
+  };
+  reader.onerror = () => toast('图片读取失败', true);
+  reader.readAsDataURL(file);
+}
+
 function insertBlock(text, cursorOffset) {
   const ta = editor;
   ta.focus();
@@ -518,7 +532,41 @@ function saveDraft() {
 function saveCfg() { saveJSON(LS_CFG, cfg); }
 
 /* ---------------- 视图 ---------------- */
+/**
+ * 切到阅读视图后，预览容器要等排版稳定才有真实滚动高度。
+ * 此时 setScrollTop 会因 max=0 静默早退，所以这里按 50ms 重试几次直到真正落位。
+ */
+function syncPreviewToLine(lineFloat, tries) {
+  const left = tries == null ? 30 : tries;
+  // 刚从 display:none 切过来时，浏览器还没算过这个容器的高度；
+  // 读一次 offsetHeight 强制同步布局，否则 scrollHeight 会是 0
+  void previewScroll.offsetHeight;
+  buildScrollAnchors();
+  const top = lineToPreviewTop(lineFloat);
+  const max = Math.max(0, previewScroll.scrollHeight - previewScroll.clientHeight);
+  if (top != null && max > 1) {
+    const target = Math.min(max, Math.max(0, top));
+    setScrollTop(previewScroll, target, true);
+    if (Math.abs(previewScroll.scrollTop - target) <= 2) return;
+  }
+  if (left > 0) setTimeout(() => syncPreviewToLine(lineFloat, left - 1), 40);
+}
+
 function setView(v) {
+  const prev = cfg.view;
+  /* 切换视图时保持阅读位置：以「源码行号」为唯一锚点，
+     阅读区 → 编辑区、编辑区 → 阅读区都换算过去，不再各自回到顶部 */
+  let keepLine = null;
+  if (prev && prev !== v) {
+    if (prev === 'read' && v !== 'read') {
+      if (previewScroll.scrollTop > 0) {
+        if (anchorsDirty) buildScrollAnchors();
+        keepLine = previewTopToLine(previewScroll.scrollTop);
+      }
+    } else if (prev !== 'read' && v === 'read') {
+      keepLine = editor.getViewportLine();
+    }
+  }
   cfg.view = v;
   document.querySelectorAll('#viewTabs button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
   document.body.classList.toggle('reading', v === 'read');
@@ -542,6 +590,13 @@ function setView(v) {
   }
   saveCfg();
   markAnchorsDirty();
+  if (keepLine != null && isFinite(keepLine)) {
+    // 切完 display 后布局要一两帧才稳定（预览宽度、折行位置都会变）
+    requestAnimationFrame(() => {
+      if (v === 'read') syncPreviewToLine(keepLine);
+      else editor.setViewportLine(keepLine);
+    });
+  }
 }
 
 function applySplit() {
@@ -1188,20 +1243,15 @@ function bindEvents() {
     });
   }
 
-  // 图片插入
+  // 图片插入（工具栏）
   $('#imgInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
     e.target.value = '';
-    if (!file) return;
-    if (file.size > 2.5 * 1024 * 1024) { toast('图片过大（>2.5MB），公众号可能拒绝', true); }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const alt = file.name.replace(/\.[^.]+$/, '');
-      surround('![', `](${reader.result})`, alt);
-      toast('图片已插入（base64 内嵌）');
-    };
-    reader.readAsDataURL(file);
+    insertImageFile(file);
   });
+
+  // 编辑区直接粘贴图片（截图 / 复制的图片）；文本粘贴不受影响，仍走原生逻辑
+  editor.addEventListener('pasteimage', (ev) => insertImageFile(ev.file));
 
   // 拖拽打开
   const dz = $('#dropzone');
@@ -1357,7 +1407,8 @@ function boot() {
       mask: $('#sidebarMask'),
       btnSidebar: $('#btnSidebar'),
       btnCollapse: $('#btnCollapse'),
-      btnPickFolder: $('#btnPickFolder')
+      btnPickFolder: $('#btnPickFolder'),
+      btnRefresh: $('#btnRefresh')
     },
     hooks: {
       toast,

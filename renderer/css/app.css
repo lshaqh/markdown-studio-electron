@@ -251,6 +251,28 @@ body.sidebar-resizing { cursor: col-resize; user-select: none; }
 #editor .cm-scroller::-webkit-scrollbar-thumb:hover { background: #bcc5cf; }
 [data-ui="dark"] #editor .cm-scroller::-webkit-scrollbar-thumb { background: #3a434d; }
 
+/* 编辑区里的 base64 图片：折叠为「缩略图 + 大小」徽章，点击展开源码 */
+.cm-img-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 100%; padding: 2px 9px 2px 3px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel-2); color: var(--text);
+  font-size: 11.5px; line-height: 1.5; vertical-align: middle;
+  cursor: pointer; user-select: none; overflow: hidden;
+}
+.cm-img-chip:hover { border-color: var(--accent); background: var(--panel); }
+.cm-img-chip:active { transform: translateY(1px); }
+.cm-img-chip__thumb {
+  height: 22px; width: auto; max-width: 64px; object-fit: cover;
+  border-radius: 3px; display: block; flex: 0 0 auto;
+  background: #fff;
+}
+.cm-img-chip__label {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 260px; color: var(--muted);
+}
+.cm-img-chip:hover .cm-img-chip__label { color: var(--text); }
+
 .statusbar {
   flex: 0 0 auto; height: 26px; display: flex; align-items: center; gap: 12px;
   padding: 0 12px; border-top: 1px solid var(--border); background: var(--panel-2);

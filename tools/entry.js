@@ -1,9 +1,10 @@
 /* CodeMirror 6 bundle 入口：只导出本项目需要的部分，控制体积 */
-import { EditorState, EditorSelection, Compartment } from '@codemirror/state';
+import { EditorState, EditorSelection, Compartment, StateField, StateEffect, RangeSetBuilder } from '@codemirror/state';
 import {
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter,
   drawSelection, dropCursor, rectangularSelection, crosshairCursor,
-  highlightSpecialChars, placeholder, scrollPastEnd
+  highlightSpecialChars, placeholder, scrollPastEnd,
+  Decoration, WidgetType, ViewPlugin
 } from '@codemirror/view';
 import {
   defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, selectAll
@@ -43,10 +44,11 @@ const mdHighlight = HighlightStyle.define([
 ]);
 
 export {
-  EditorState, EditorSelection, Compartment,
+  EditorState, EditorSelection, Compartment, StateField, StateEffect, RangeSetBuilder,
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter,
   drawSelection, dropCursor, rectangularSelection, crosshairCursor,
   highlightSpecialChars, placeholder, scrollPastEnd,
+  Decoration, WidgetType, ViewPlugin,
   defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, selectAll,
   syntaxHighlighting, HighlightStyle, bracketMatching, indentOnInput, indentUnit,
   foldGutter, foldKeymap,

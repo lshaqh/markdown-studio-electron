@@ -59,6 +59,96 @@ const EditorAdapter = (() => {
     ]);
   }
 
+  /* ---------------- 图片占位：把超长 base64 折叠成缩略徽章 ----------------
+   *  只在视图层用 Decoration 替换，文档内容仍是原始 base64，
+   *  保存 / 导出 / 复制走的都是完整 data URI，不改变 md 文件本身。
+   * ---------------------------------------------------------------- */
+  // 刻意不匹配换行：Decoration.replace 跨行会抛「跨行替换」错误
+  const IMG_DATA_RE = /!\[([^\]\n]{0,120})\]\((data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+)\)/gi;
+
+  const toggleImageFold = CM6.StateEffect.define();
+  const unfoldedImages = CM6.StateField.define({
+    create: () => new Set(),
+    update(set, tr) {
+      let next = set;
+      for (const e of tr.effects) {
+        if (e.is(toggleImageFold)) {
+          next = new Set(next);
+          if (next.has(e.value)) next.delete(e.value);
+          else next.add(e.value);
+        }
+      }
+      // 文档一变，记录的偏移就失效了，直接复位避免错位折叠
+      if (tr.docChanged && next.size) next = new Set();
+      return next;
+    }
+  });
+
+  function imgBytesLabel(b64) {
+    const n = Math.floor(b64.length * 3 / 4);
+    if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+    return Math.max(1, Math.round(n / 1024)) + ' KB';
+  }
+
+  class ImageChip extends CM6.WidgetType {
+    constructor(alt, dataUrl, from, view) {
+      super();
+      this.alt = alt;
+      this.dataUrl = dataUrl;
+      this.from = from;
+      this.view = view;
+    }
+    eq(o) { return o.alt === this.alt && o.dataUrl === this.dataUrl && o.from === this.from; }
+    toDOM() {
+      const chip = document.createElement('span');
+      chip.className = 'cm-img-chip';
+      chip.title = (this.alt || '图片') + ' · ' + imgBytesLabel(this.dataUrl) + '（点击展开源码）';
+      const thumb = document.createElement('img');
+      thumb.className = 'cm-img-chip__thumb';
+      thumb.src = this.dataUrl;
+      thumb.alt = this.alt || '';
+      const label = document.createElement('span');
+      label.className = 'cm-img-chip__label';
+      label.textContent = (this.alt ? this.alt + ' · ' : '图片 · ') + imgBytesLabel(this.dataUrl);
+      chip.append(thumb, label);
+      chip.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.view.dispatch({ effects: toggleImageFold.of(this.from) });
+      });
+      return chip;
+    }
+    ignoreEvent() { return false; }
+  }
+
+  function buildImageDecos(view) {
+    const b = new CM6.RangeSetBuilder();
+    const unfolded = view.state.field(unfoldedImages);
+    for (const { from, to } of view.visibleRanges) {
+      const text = view.state.doc.sliceString(from, to);
+      IMG_DATA_RE.lastIndex = 0;
+      let m;
+      while ((m = IMG_DATA_RE.exec(text))) {
+        const start = from + m.index;
+        const end = start + m[0].length;
+        if (unfolded.has(start)) continue;
+        b.add(start, end, CM6.Decoration.replace({
+          widget: new ImageChip(m[1], m[2], start, view),
+          inclusive: false
+        }));
+      }
+    }
+    return b.finish();
+  }
+
+  const imageFold = CM6.ViewPlugin.fromClass(class {
+    constructor(view) { this.decorations = buildImageDecos(view); }
+    update(u) {
+      const toggle = u.state.field(unfoldedImages) !== u.startState.field(unfoldedImages);
+      if (u.docChanged || u.viewportChanged || toggle) this.decorations = buildImageDecos(u.view);
+    }
+  }, { decorations: v => v.decorations });
+
   /* ---------------- 初始化 ---------------- */
   function init(mountEl, opts = {}) {
     if (!window.CM6) {
@@ -125,6 +215,22 @@ const EditorAdapter = (() => {
         CM6.scrollPastEnd(),
         // 长行自动折行：不再需要把编辑栏拉得很宽才能看全内容
         CM6.EditorView.lineWrapping,
+        // 粘贴图片：拦截剪贴板里的 image/* 交给外层转 base64；纯文本仍走 CM6 原生粘贴
+        CM6.EditorView.domEventHandlers({
+          paste: (event) => {
+            const dt = event.clipboardData;
+            if (!dt || !dt.items) return false;
+            const hit = Array.from(dt.items).find(it => it.kind === 'file' && /^image\//i.test(it.type));
+            if (!hit) return false;
+            const file = hit.getAsFile();
+            if (!file) return false;
+            event.preventDefault();
+            emit('pasteimage', { file });
+            return true;
+          }
+        }),
+        unfoldedImages,
+        imageFold,
         CM6.markdown({ base: CM6.markdownLanguage, addKeymap: true }),
         keysCompartment.of(buildKeys()),
         CM6.EditorView.updateListener.of((u) => {

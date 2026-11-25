@@ -276,6 +276,58 @@ const Vault = (() => {
     }
   }
 
+  /* ---------------- 刷新目录 ----------------
+   *  重新扫描当前文件夹并把新增/删除同步到文件树；
+   *  不清理 expanded 与未保存缓存，避免打断正在编辑的内容。
+   * ------------------------------------------ */
+  function applyRefresh(list, name) {
+    const prevPaths = new Set(state.entries.map(e => e.path));
+    const next = list.filter(e => MD_EXT.test(e.path)).slice(0, MAX_FILES);
+    const nextPaths = new Set(next.map(e => e.path));
+    const added = next.filter(e => !prevPaths.has(e.path)).length;
+    const removed = state.entries.filter(e => !nextPaths.has(e.path)).length;
+    state.entries = next;
+    if (name) state.name = name;
+    // 当前文件被删除/改名时取消选中，否则保存会写到一个不存在的路径
+    if (state.current && !nextPaths.has(state.current)) state.current = null;
+    render();
+    if (hooks.onVaultChange) hooks.onVaultChange(stats());
+    if (hooks.toast) {
+      hooks.toast(added || removed
+        ? `已刷新：新增 ${added}、移除 ${removed}，共 ${next.length} 个文档`
+        : `已刷新，${next.length} 个文档（无变化）`);
+    }
+    return next.length;
+  }
+
+  async function refresh() {
+    if (state.mode === 'native' && state.rootDir && window.native && typeof window.native.listTree === 'function') {
+      try {
+        const r = await window.native.listTree(state.rootDir);
+        if (!r || !r.ok) {
+          if (hooks.toast) hooks.toast('刷新失败：' + ((r && r.error) || '未知错误'), true);
+          return 0;
+        }
+        return applyRefresh(r.entries || [], state.name);
+      } catch (err) {
+        if (hooks.toast) hooks.toast('刷新失败：' + (err.message || err), true);
+        return 0;
+      }
+    }
+    if (state.mode === 'handle' && state.rootHandle) {
+      const out = [];
+      try {
+        await walkDirectoryHandle(state.rootHandle, '', out);
+      } catch (err) {
+        if (hooks.toast) hooks.toast('刷新失败：' + (err.message || err), true);
+        return 0;
+      }
+      return applyRefresh(out, state.name);
+    }
+    if (hooks.toast) hooks.toast('当前来源不支持刷新，请用 📁 重新选择文件夹', true);
+    return 0;
+  }
+
   /* ---------------- 树渲染 ---------------- */
   function buildTree() {
     const root = { children: new Map() };
@@ -357,6 +409,27 @@ const Vault = (() => {
       });
     }
 
+    // 侧栏刷新按钮：重新扫描当前文件夹
+    if (ui.btnRefresh) {
+      ui.btnRefresh.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (ui.btnRefresh.disabled) return;
+        ui.btnRefresh.disabled = true;
+        try { await refresh(); } finally { ui.btnRefresh.disabled = false; }
+      });
+    }
+
+    // 从别的应用切回来时自动补一次刷新（30 秒节流，避免频繁重排文件树）
+    let lastAutoRefresh = 0;
+    window.addEventListener('focus', () => {
+      if (state.mode !== 'native' && state.mode !== 'handle') return;
+      if (!state.entries.length && !state.name) return;
+      const now = Date.now();
+      if (now - lastAutoRefresh < 30000) return;
+      lastAutoRefresh = now;
+      refresh();
+    });
+
     ui.tree.addEventListener('click', async (e) => {
       const row = e.target.closest('.tree-row');
       if (!row) return;
@@ -424,6 +497,7 @@ const Vault = (() => {
     loadFromFileList,
     loadFromDroppedItems,
     openPath,
+    refresh,
     stash,
     hasDirty,
     clearDirty,
