@@ -1131,6 +1131,34 @@ function bindEvents() {
     toast('已复制图片源码');
   });
 
+  /* 图片大图预览：点编辑区里的缩略图打开，可在「适应窗口 / 实际大小」间切换 */
+  let imgZoom = false;
+  function setImgZoom(on) {
+    imgZoom = !!on;
+    $('#imgViewStage').classList.toggle('actual', imgZoom);
+    $('#btnImgViewZoom').textContent = imgZoom ? '适应窗口' : '实际大小';
+  }
+  editor.addEventListener('previewimage', (d) => {
+    if (!d) return;
+    const img = $('#imgViewImg');
+    img.alt = d.alt || '';
+    img.src = d.src;
+    $('#imgViewName').textContent = d.alt || '图片预览';
+    $('#imgViewHint').textContent = '';
+    img.onload = () => {
+      $('#imgViewHint').textContent = img.naturalWidth + ' × ' + img.naturalHeight + ' px';
+    };
+    setImgZoom(false);
+    $('#imgViewMask').classList.add('show');
+  });
+  $('#btnImgViewZoom').addEventListener('click', () => setImgZoom(!imgZoom));
+  $('#imgViewImg').addEventListener('click', () => setImgZoom(!imgZoom));
+  // 点遮罩空白处关闭（两个图片相关弹窗都适用）
+  ['imgViewMask', 'imgSrcMask'].forEach((id) => {
+    const m = document.getElementById(id);
+    if (m) m.addEventListener('mousedown', (e) => { if (e.target === m) m.classList.remove('show'); });
+  });
+
   /* ---- 滚动同步：谁在被用户滚，谁就是主控，另一侧跟随 ---- */
   const progressEl = $('#progress');
   let editorRAF = 0, previewRAF = 0;   // 两侧独立合并，避免互相吞掉

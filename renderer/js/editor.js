@@ -91,26 +91,40 @@ const EditorAdapter = (() => {
     toDOM() {
       const chip = document.createElement('span');
       chip.className = 'cm-img-chip';
-      chip.title = (this.alt || '图片') + ' · ' + imgBytesLabel(this.dataUrl) + '（点击查看 / 编辑源码）';
+      chip.title = '点击图片看大图；点击下方文字查看 / 编辑源码';
       const thumb = document.createElement('img');
       thumb.className = 'cm-img-chip__thumb';
       thumb.src = this.dataUrl;
       thumb.alt = this.alt || '';
       thumb.draggable = false;
+      thumb.title = '点击看大图';
       const meta = document.createElement('span');
       meta.className = 'cm-img-chip__meta';
+      meta.title = '点击查看 / 编辑源码';
       const name = document.createElement('span');
       name.className = 'cm-img-chip__name';
       name.textContent = this.alt || '未命名图片';
       const size = document.createElement('span');
       size.className = 'cm-img-chip__size';
-      size.textContent = imgBytesLabel(this.dataUrl) + ' · 点击查看源码';
+      size.textContent = imgBytesLabel(this.dataUrl) + ' · 查看源码';
       meta.append(name, size);
       chip.append(thumb, meta);
-      chip.addEventListener('mousedown', (e) => {
+
+      const openSource = (e) => {
         e.preventDefault();
         e.stopPropagation();
         emit('editimage', { from: this.from, to: this.to, source: this.source });
+      };
+      // 点图片本身 → 大图预览；点文字区 → 源码窗口
+      thumb.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        emit('previewimage', { src: this.dataUrl, alt: this.alt });
+      });
+      meta.addEventListener('mousedown', openSource);
+      chip.addEventListener('mousedown', (e) => {
+        if (e.target && e.target.closest && e.target.closest('.cm-img-chip__thumb')) return;
+        openSource(e);
       });
       return chip;
     }

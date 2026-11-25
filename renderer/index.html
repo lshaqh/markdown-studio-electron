@@ -243,6 +243,28 @@
   </div>
 </div>
 
+<!-- 图片大图预览：点编辑区里的图片缩略图打开 -->
+<div class="mask" id="imgViewMask">
+  <div class="modal" style="max-width:min(1100px,94vw)">
+    <div class="modal-head">
+      <span id="imgViewName">图片预览</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn ghost" data-close="imgViewMask">关闭</button>
+    </div>
+    <div class="modal-body">
+      <div class="img-view-stage" id="imgViewStage">
+        <img class="img-view-img" id="imgViewImg" alt="">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="hint" id="imgViewHint"></span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn" id="btnImgViewZoom">实际大小</button>
+      <button class="btn primary" data-close="imgViewMask">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- 图片源码：真实照片的 base64 有十几万字符，摊在编辑区会把那一行撑到几万像素高，
      所以不在这里展开，改成弹窗查看 / 修改 -->
 <div class="mask" id="imgSrcMask">

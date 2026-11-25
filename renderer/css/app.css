@@ -275,6 +275,21 @@ body.sidebar-resizing { cursor: col-resize; user-select: none; }
 }
 .cm-img-chip__size { font-size: 10.5px; line-height: 1.4; color: var(--muted); }
 
+/* 图片大图预览弹窗 */
+.img-view-stage {
+  display: flex; align-items: center; justify-content: center;
+  overflow: auto; max-height: 68vh; padding: 8px;
+  background: var(--bg); border-radius: 10px;
+}
+.img-view-img {
+  display: block; max-width: 100%; max-height: 64vh;
+  object-fit: contain; cursor: zoom-in;
+  box-shadow: 0 6px 20px rgba(0,0,0,.14); border-radius: 4px; background: #fff;
+}
+/* 实际大小：按原像素显示，超出就在舞台内滚动 */
+.img-view-stage.actual { align-items: flex-start; justify-content: flex-start; }
+.img-view-stage.actual .img-view-img { max-width: none; max-height: none; cursor: zoom-out; }
+
 /* 图片源码弹窗 */
 .img-src-area {
   width: 100%; height: 300px; resize: vertical; box-sizing: border-box;
