@@ -21,6 +21,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 发布说明来自仓库根的 RELEASE_NOTES.md。
+      # 以前用 generate_release_notes: true，因为历史里没有可比对的 tag，
+      # 生成出来只有一行 Full Changelog，等于没写。这里改为强制人工维护，
+      # 并要求文件开头出现本次 tag，避免说明与版本对不上。
+      - name: Verify release notes match tag
+        shell: bash
+        run: |
+          set -e
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          echo "release tag: $TAG"
+          if [ ! -f RELEASE_NOTES.md ]; then
+            echo "::error::RELEASE_NOTES.md 不存在，请先补充发布说明"
+            exit 1
+          fi
+          if ! head -n 3 RELEASE_NOTES.md | grep -qF "$TAG"; then
+            echo "::error::RELEASE_NOTES.md 开头未出现 $TAG，请先把发布说明更新为本次版本"
+            exit 1
+          fi
+          echo "release notes ok"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -40,7 +60,8 @@ jobs:
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           name: Markdown Studio ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
           files: |
             release/*.exe
             release/*.yml
