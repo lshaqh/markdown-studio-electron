@@ -76,13 +76,14 @@ const EditorAdapter = (() => {
   }
 
   class ImageChip extends CM6.WidgetType {
-    constructor(alt, dataUrl, from, to, source) {
+    constructor(alt, dataUrl, from, to, source, view) {
       super();
       this.alt = alt;
       this.dataUrl = dataUrl;
       this.from = from;
       this.to = to;
       this.source = source;
+      this.view = view;
     }
     eq(o) {
       return o.alt === this.alt && o.dataUrl === this.dataUrl &&
@@ -98,6 +99,9 @@ const EditorAdapter = (() => {
       thumb.alt = this.alt || '';
       thumb.draggable = false;
       thumb.title = '点击看大图';
+      /* 图片是按原尺寸渲染的，解码完成前测量到的高度偏小，
+         加载完必须让 CodeMirror 重新量一次这一行 */
+      thumb.addEventListener('load', () => { if (this.view) this.view.requestMeasure(); });
       const meta = document.createElement('span');
       meta.className = 'cm-img-chip__meta';
       meta.title = '点击查看 / 编辑源码';
@@ -154,7 +158,7 @@ const EditorAdapter = (() => {
           const start = line.from + m.index;
           const end = start + m[0].length;
           b.add(start, end, CM6.Decoration.replace({
-            widget: new ImageChip(m[1], m[2], start, end, m[0]),
+            widget: new ImageChip(m[1], m[2], start, end, m[0], view),
             inclusive: false
           }));
         }

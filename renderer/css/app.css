@@ -265,8 +265,11 @@ body.sidebar-resizing { cursor: col-resize; user-select: none; }
 }
 .cm-img-chip:hover { border-color: var(--accent); background: var(--panel); }
 .cm-img-chip__thumb {
-  display: block; max-width: 100%; max-height: 180px; width: auto; height: auto;
-  border-radius: 5px; background: #fff; object-fit: contain;
+  /* 按原始像素显示，只有超出编辑区宽度时才等比缩到 100%，
+     不再限高——限高会把截图压扁到看不清内容 */
+  display: block; max-width: 100%; max-height: none;
+  width: auto; height: auto;
+  border-radius: 5px; background: #fff;
 }
 .cm-img-chip__meta { display: flex; flex-direction: column; gap: 0; max-width: 100%; }
 .cm-img-chip__name {
@@ -275,20 +278,25 @@ body.sidebar-resizing { cursor: col-resize; user-select: none; }
 }
 .cm-img-chip__size { font-size: 10.5px; line-height: 1.4; color: var(--muted); }
 
-/* 图片大图预览弹窗 */
+/* 图片大图预览弹窗：舞台固定高度，图片始终居中；滚轮缩放、可拖动 */
 .img-view-stage {
-  display: flex; align-items: center; justify-content: center;
-  overflow: auto; max-height: 68vh; padding: 8px;
-  background: var(--bg); border-radius: 10px;
+  overflow: auto; height: min(62vh, 640px); min-height: 220px;
+  padding: 8px; background: var(--bg); border-radius: 10px;
+  /* 不用 justify-content/align-items 居中：内容大于容器时左上角会被裁掉且滚不到，
+     改用子元素 margin:auto（内容小于容器时居中，大于时正常滚动） */
+  display: flex;
 }
+.img-view-stage.can-pan { cursor: grab; }
+.img-view-stage.dragging { cursor: grabbing; user-select: none; }
+.img-view-inner { margin: auto; }
+/* 内容比舞台大时，auto 边距会把左侧挤成滚不到的死区（scrollLeft 恒为 0），
+   这时改回 0 边距，配合缩放时对鼠标位置的锚定来定位画面 */
+.img-view-stage.overflowing .img-view-inner { margin: 0; }
 .img-view-img {
-  display: block; max-width: 100%; max-height: 64vh;
-  object-fit: contain; cursor: zoom-in;
-  box-shadow: 0 6px 20px rgba(0,0,0,.14); border-radius: 4px; background: #fff;
+  display: block; max-width: none; max-height: none;
+  border-radius: 4px; background: #fff;
+  box-shadow: 0 6px 20px rgba(0,0,0,.14);
 }
-/* 实际大小：按原像素显示，超出就在舞台内滚动 */
-.img-view-stage.actual { align-items: flex-start; justify-content: flex-start; }
-.img-view-stage.actual .img-view-img { max-width: none; max-height: none; cursor: zoom-out; }
 
 /* 图片源码弹窗 */
 .img-src-area {

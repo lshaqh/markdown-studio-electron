@@ -253,13 +253,15 @@
     </div>
     <div class="modal-body">
       <div class="img-view-stage" id="imgViewStage">
-        <img class="img-view-img" id="imgViewImg" alt="">
+        <div class="img-view-inner"><img class="img-view-img" id="imgViewImg" alt=""></div>
       </div>
     </div>
     <div class="modal-foot">
       <span class="hint" id="imgViewHint"></span>
       <span class="spacer" style="flex:1"></span>
-      <button class="btn" id="btnImgViewZoom">实际大小</button>
+      <span class="hint" id="imgViewZoomLabel" style="min-width:46px;text-align:right"></span>
+      <button class="btn" id="btnImgViewFit">适应窗口</button>
+      <button class="btn" id="btnImgView100">100%</button>
       <button class="btn primary" data-close="imgViewMask">关闭</button>
     </div>
   </div>

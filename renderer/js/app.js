@@ -1131,28 +1131,87 @@ function bindEvents() {
     toast('已复制图片源码');
   });
 
-  /* 图片大图预览：点编辑区里的缩略图打开，可在「适应窗口 / 实际大小」间切换 */
-  let imgZoom = false;
-  function setImgZoom(on) {
-    imgZoom = !!on;
-    $('#imgViewStage').classList.toggle('actual', imgZoom);
-    $('#btnImgViewZoom').textContent = imgZoom ? '适应窗口' : '实际大小';
+  /* 图片大图预览：滚轮缩放（以鼠标位置为中心），图片始终居中，放大后可拖动平移 */
+  let imgNatW = 0, imgNatH = 0, imgZoom = 1;
+
+  function imgFitScale() {
+    const st = $('#imgViewStage');
+    if (!imgNatW || !imgNatH) return 1;
+    const aw = Math.max(60, st.clientWidth - 16);
+    const ah = Math.max(60, st.clientHeight - 16);
+    return Math.min(1, aw / imgNatW, ah / imgNatH);
   }
+
+  function applyImgZoom(z, anchor) {
+    const st = $('#imgViewStage'), img = $('#imgViewImg');
+    if (!imgNatW || !imgNatH) return;
+    const next = Math.min(8, Math.max(0.06, z));
+    const rect = st.getBoundingClientRect();
+    const ax = anchor ? Math.max(0, Math.min(st.clientWidth, anchor.x - rect.left)) : st.clientWidth / 2;
+    const ay = anchor ? Math.max(0, Math.min(st.clientHeight, anchor.y - rect.top)) : st.clientHeight / 2;
+    const oldW = img.clientWidth || 1, oldH = img.clientHeight || 1;
+    const rx = (st.scrollLeft + ax) / oldW;
+    const ry = (st.scrollTop + ay) / oldH;
+    imgZoom = next;
+    img.style.width = Math.round(imgNatW * next) + 'px';
+    img.style.height = Math.round(imgNatH * next) + 'px';
+    // 先决定是否处于「内容超出」状态（影响边距），再设滚动位置，否则滚动量会被旧布局截断
+    const overflowing = st.scrollWidth > st.clientWidth + 1 || st.scrollHeight > st.clientHeight + 1;
+    st.classList.toggle('can-pan', overflowing);
+    st.classList.toggle('overflowing', overflowing);
+    // 把鼠标所在的那一点挪回原处，缩放时画面就不会往左上角跑
+    st.scrollLeft = rx * img.clientWidth - ax;
+    st.scrollTop = ry * img.clientHeight - ay;
+    $('#imgViewZoomLabel').textContent = Math.round(next * 100) + '%';
+  }
+
   editor.addEventListener('previewimage', (d) => {
     if (!d) return;
     const img = $('#imgViewImg');
+    imgNatW = 0; imgNatH = 0; imgZoom = 1;
     img.alt = d.alt || '';
+    img.removeAttribute('style');
     img.src = d.src;
     $('#imgViewName').textContent = d.alt || '图片预览';
     $('#imgViewHint').textContent = '';
-    img.onload = () => {
-      $('#imgViewHint').textContent = img.naturalWidth + ' × ' + img.naturalHeight + ' px';
-    };
-    setImgZoom(false);
+    $('#imgViewZoomLabel').textContent = '';
     $('#imgViewMask').classList.add('show');
+    const ready = () => {
+      imgNatW = img.naturalWidth || 0;
+      imgNatH = img.naturalHeight || 0;
+      $('#imgViewHint').textContent = imgNatW + ' × ' + imgNatH + ' px';
+      applyImgZoom(imgFitScale());     // 打开时先按窗口大小适配
+    };
+    if (img.complete && img.naturalWidth) ready();
+    else img.onload = ready;
   });
-  $('#btnImgViewZoom').addEventListener('click', () => setImgZoom(!imgZoom));
-  $('#imgViewImg').addEventListener('click', () => setImgZoom(!imgZoom));
+  $('#btnImgViewFit').addEventListener('click', () => applyImgZoom(imgFitScale()));
+  $('#btnImgView100').addEventListener('click', () => applyImgZoom(1));
+  $('#imgViewStage').addEventListener('wheel', (e) => {
+    if (!imgNatW) return;
+    e.preventDefault();
+    applyImgZoom(imgZoom * Math.exp(-e.deltaY * 0.0015), { x: e.clientX, y: e.clientY });
+  }, { passive: false });
+
+  // 放大超出窗口后可以按住拖动查看
+  const imgStage = $('#imgViewStage');
+  let imgDrag = null;
+  imgStage.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || !imgStage.classList.contains('can-pan')) return;
+    imgDrag = { x: e.clientX, y: e.clientY, l: imgStage.scrollLeft, t: imgStage.scrollTop };
+    imgStage.classList.add('dragging');
+    try { imgStage.setPointerCapture(e.pointerId); } catch (err) { /* 老内核忽略 */ }
+    e.preventDefault();
+  });
+  imgStage.addEventListener('pointermove', (e) => {
+    if (!imgDrag) return;
+    imgStage.scrollLeft = imgDrag.l - (e.clientX - imgDrag.x);
+    imgStage.scrollTop = imgDrag.t - (e.clientY - imgDrag.y);
+  });
+  ['pointerup', 'pointercancel'].forEach((t) => imgStage.addEventListener(t, () => {
+    imgDrag = null;
+    imgStage.classList.remove('dragging');
+  }));
   // 点遮罩空白处关闭（两个图片相关弹窗都适用）
   ['imgViewMask', 'imgSrcMask'].forEach((id) => {
     const m = document.getElementById(id);
